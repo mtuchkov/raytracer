@@ -45,7 +45,7 @@ impl Vec3 {
         self.z
     }
 
-    fn length(&self) -> f32 {
+    pub(crate) fn length(&self) -> f32 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 
@@ -123,7 +123,7 @@ impl Ray {
 }
 
 mod algebra {
-    use std::ops::Index;
+    use std::ops::{Index, Neg};
     use std::ops::Add;
     use std::ops::AddAssign;
     use std::ops::Sub;
@@ -366,6 +366,30 @@ mod algebra {
             self.x /= other;
             self.y /= other;
             self.z /= other;
+        }
+    }
+
+    impl Neg for Vec3 {
+        type Output = Vec3;
+
+        fn neg(self) -> Vec3 {
+            Vec3 {
+                x: -self.x,
+                y: -self.y,
+                z: -self.z,
+            }
+        }
+    }
+
+    impl Neg for &Vec3 {
+        type Output = Vec3;
+
+        fn neg(self) -> Vec3 {
+            Vec3 {
+                x: -self.x,
+                y: -self.y,
+                z: -self.z,
+            }
         }
     }
 }

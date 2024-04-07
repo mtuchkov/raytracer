@@ -67,7 +67,7 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
         Surface::sphere(
             Vec3::new(0.0, 0.0, -1.0),
             0.5,
-            Material::lambertian(Vec3::rgb(0.8, 0.3, 0.3))));
+            Material::lambertian(Vec3::rgb(0.1, 0.2, 0.5))));
     world.add(
         Surface::sphere(
             Vec3::new(0.0, -100.5, -1.0),
@@ -82,7 +82,12 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
         Surface::sphere(
             Vec3::new(-1.0, 0.0, -1.0),
             0.5,
-            Material::metal(Vec3::rgb(0.8, 0.8, 0.8), 0.8)));
+            Material::dielectric(1.5)));
+    world.add(
+        Surface::sphere(
+            Vec3::new(-1.0, 0.0, -1.0),
+            -0.45, // trick with negative radius to make the sphere hollow
+            Material::dielectric(1.5)));
 
     let camera = Camera::new();
 

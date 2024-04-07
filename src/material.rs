@@ -1,3 +1,4 @@
+use crate::ffi::drand48_safe;
 use crate::surfaces::hitable::HitRecord;
 use crate::vec::{Ray, Vec3};
 
@@ -6,9 +7,19 @@ pub(crate) enum Material {
     Lambertian {
         albedo: Vec3,
     },
+    // not transparent material that reflects the light
     Metal {
         albedo: Vec3,
         fuzz: f32,
+    },
+    // transparent material that refracts and also reflects the light
+    Dielectric {
+        ref_idx: f32,
+        // Since glass absorbs no light the attenuation is always 1.0
+        // for dielectric material. Let's make a parameter of the material.
+        // We could also make it a constant, but we may want to experiment
+        // with transparency.
+        attenuation: Vec3,
     }
 }
 
@@ -31,6 +42,12 @@ impl Material {
     pub(crate) fn metal(albedo: Vec3, fuzz: f32) -> Material {
         Material::Metal { albedo, fuzz }
     }
+    pub(crate) fn dielectric(ref_idx: f32) -> Material {
+        Material::Dielectric {
+            ref_idx,
+            attenuation: Vec3::new(1.0, 1.0, 1.0)
+        }
+    }
 }
 
 impl Scatterable for Material {
@@ -50,6 +67,28 @@ impl Scatterable for Material {
         // and compiler will show an error.
         // The analog of the `default` case in C++ or Java is the `_` in Rust.
 
+        fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
+            v - &(2.0 * Vec3::dot(v, n) * n)
+        }
+
+        fn refract(v: &Vec3, n: &Vec3, ni_over_nt: f32) -> Option<Vec3> {
+            let uv = v.unit();
+            let dt = Vec3::dot(&uv, n);
+            let discriminant = 1.0 - ni_over_nt * ni_over_nt * (1.0 - dt * dt);
+            if discriminant > 0.0 {
+                let refracted = ni_over_nt * (&uv - &(n * dt)) - &(n * discriminant.sqrt());
+                Some(refracted)
+            } else {
+                None
+            }
+        }
+
+        // reflection function for dielectric material
+        fn schlick(cosine: f32, ref_idx: f32) -> f32 {
+            let r0 = ((1.0 - ref_idx) / (1.0 + ref_idx)).powi(2);
+            r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
+        }
+
         match self {
             // LEARN:
             // the enum is destructed her and the structs fields are accessed by ref.
@@ -61,9 +100,6 @@ impl Scatterable for Material {
                 Some((scattered, attenuation))
             }
             Material::Metal { albedo, fuzz } => {
-                fn reflect(v: &Vec3, n: &Vec3) -> Vec3 {
-                    v - &(2.0 * Vec3::dot(v, n) * n)
-                }
 
                 let reflected = reflect(&r_in.direction().unit(), &rec.normal);
                 let direction = reflected + *fuzz * Vec3::random_in_unit_sphere();
@@ -73,6 +109,36 @@ impl Scatterable for Material {
                     Some((scattered, attenuation))
                 } else {
                     None
+                }
+            }
+            Material::Dielectric {ref_idx, attenuation} => {
+
+                let outward_normal: Vec3;
+                let reflected = reflect(&r_in.direction(), &rec.normal);
+                let ni_over_nt: f32;
+                let cosine: f32;
+
+                if Vec3::dot(r_in.direction(), &rec.normal) > 0.0 {
+                    ni_over_nt = *ref_idx;
+                    cosine = *ref_idx * Vec3::dot(r_in.direction(), &rec.normal) / r_in.direction().length();
+                    outward_normal = -&rec.normal;
+                } else {
+                    ni_over_nt = 1.0 / *ref_idx;
+                    cosine = -Vec3::dot(r_in.direction(), &rec.normal) / r_in.direction().length();
+                    outward_normal = rec.normal;
+                }
+
+                match refract(&r_in.direction(), &outward_normal, ni_over_nt) {
+                    Some(refracted) => {
+                        // some rays are reflected and some are refracted
+                        // depends on the angle of view
+                        if (drand48_safe() as f32) >= schlick(cosine, *ref_idx) {
+                            Some((Ray::from(rec.p, refracted), attenuation))
+                        } else {
+                            Some((Ray::from(rec.p, reflected), attenuation))
+                        }
+                    },
+                    None => Some((Ray::from(rec.p, reflected), attenuation)),
                 }
             }
         }

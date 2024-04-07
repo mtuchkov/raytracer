@@ -8,7 +8,7 @@ pub(crate) struct World {
 }
 
 impl World {
-    pub(crate) fn new() -> World {
+    pub(crate) fn new<'a>() -> World {
         World {
             objects: Vec::new(),
             size: 0,
@@ -22,7 +22,7 @@ impl World {
 }
 
 impl Hitable for World {
-    fn hit(&self, r: &Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
+    fn hit<'a>(&'a self, r: &'a Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {
         let mut temp_rec = None;
 
         let mut closest_so_far = t_max;

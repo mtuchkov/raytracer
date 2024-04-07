@@ -6,6 +6,7 @@ use std::io::{Error, Write};
 use crate::camera::Camera;
 use crate::color::Color;
 use crate::ffi::drand48_safe;
+use crate::material::{Material, Scatterable};
 use crate::surfaces::hitable::Hitable;
 use crate::surfaces::Surface;
 use crate::surfaces::world::World;
@@ -61,8 +62,27 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
     let ns = 100;
 
     let mut world = World::new();
-    world.add(Surface::sphere(Vec3::new(0.0, 0.0, -1.0), 0.5));
-    world.add(Surface::sphere(Vec3::new(0.0, -100.5, -1.0), 100.0));
+
+    world.add(
+        Surface::sphere(
+            Vec3::new(0.0, 0.0, -1.0),
+            0.5,
+            Material::lambertian(Vec3::rgb(0.8, 0.3, 0.3))));
+    world.add(
+        Surface::sphere(
+            Vec3::new(0.0, -100.5, -1.0),
+            100.0,
+            Material::lambertian(Vec3::rgb(0.8, 0.8, 0.0))));
+    world.add(
+        Surface::sphere(
+            Vec3::new(1.0, 0.0, -1.0),
+            0.5,
+            Material::metal(Vec3::rgb(0.8, 0.6, 0.2), 0.2)));
+    world.add(
+        Surface::sphere(
+            Vec3::new(-1.0, 0.0, -1.0),
+            0.5,
+            Material::metal(Vec3::rgb(0.8, 0.8, 0.8), 0.8)));
 
     let camera = Camera::new();
 
@@ -83,7 +103,7 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
             let v = (y as f64 + drand48_safe()) as f32 / h as f32;
 
             let ray = camera.get_ray(u, v);
-            col += color(&world, &ray);
+            col += color(&world, &ray, 0);
         }
         col /= ns as f32;
         col
@@ -97,11 +117,16 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
         .flat_map(|y| (0..w).into_iter().map(move |x| (x as f32, y as f32)));
 
     // LEARN:
-    // `Result` is a monad that implements the `FromIterator` trait.
-    // It's `FromIterator` impl allows to collect the results of the iterator
-    // into a single Result of Vec<results>
-    // or stop on the first error.
-
+    // Note that the last `map` operation returns the `Result<(), Error>` type.
+    // The `collect()` is a generic method over the element's type.
+    // Compiler uses the impl of the `FromIterator` trait for the `Result` type.
+    //
+    // `Result`s `FromIterator` impl allows to collect the results of the iterator
+    // into a single Result of Vec<results> or stop on the first error.
+    //
+    // Inspired by the Haskell's `traverse` function for sequences.
+    // or in FunctionalJava:
+    // <B> Option<Seq<B>> traverseOption(F<A, Option<B>> f){...} in Seq.java
     let result: Result<Vec<()>, Error> = xy_iter
         .map(render_pixel)
         .map(write_color_to_file(img))
@@ -115,8 +140,8 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
     }
 }
 
-fn write_color_to_file(img: &mut File) -> Box<dyn FnMut(Vec3) -> Result<(), Error> + '_> {
-    Box::new(|color: Vec3| {
+fn write_color_to_file(img: &mut File) -> impl FnMut(Vec3) -> Result<(), Error> + '_ {
+    |color: Vec3| {
         // There is a bug in the book, probably.
         // According to the book the color should be divided by ns.
         // But the image turns to be very dark.
@@ -133,31 +158,26 @@ fn write_color_to_file(img: &mut File) -> Box<dyn FnMut(Vec3) -> Result<(), Erro
         // No new strings are created. Format is a const string.
         // write! macro splits the format, and writes the pieces and arguments
         // to the file buffer.
+        // Compare to C++ std::cout << ir << " " << ig << " " << ib << std::endl;
         write!(img, "{} {} {}\n", ir, ig, ib)
-    })
-}
-
-fn random_in_unit_sphere() -> Vec3 {
-    loop {
-        let rand = Vec3::new(
-            drand48_safe() as f32,
-            drand48_safe() as f32,
-            drand48_safe() as f32);
-        let vec1 = Vec3::rgb(1.0, 1.0, 1.0);
-        let p = 2.0 * rand - vec1;
-        if p.squared_length() < 1.0 {
-            return p;
-        }
     }
 }
 
-fn color(w: &World, r: &Ray) -> Vec3 {
+fn color(w: &World, r: &Ray, recurs_dep: i32) -> Vec3 {
     // 0.001 as a min value is chosen to avoid the
     // shadow acne problem (too white or too dark spots).
-    match w.hit(r, 0.001, std::f32::MAX) {
+    match w.hit(r, 0.001, f32::MAX) {
         Some(hit) => {
-            let target = &hit.p + hit.normal + random_in_unit_sphere();
-            0.5 * color(w, &Ray::from(hit.p.clone(), target - hit.p))
+            if recurs_dep < 50 {
+                match hit.material.scatter(r, hit) {
+                    Some((s, a)) => {
+                        a * color(w, &s, recurs_dep + 1)
+                    },
+                    None => Vec3::zero(),
+                }
+            } else {
+                Vec3::zero()
+            }
         },
         None => background(r),
     }
@@ -167,7 +187,7 @@ fn color(w: &World, r: &Ray) -> Vec3 {
 fn background(r: &Ray) -> Vec3 {
     let unit_direction = r.direction().unit();
     let t = 0.5 * (unit_direction.y() + 1.0);
-    (1.0 - t) * Vec3::rgb(1.0, 1.0, 1.0) + t * Vec3::rgb(0.5, 0.7, 1.0)
+    (1.0 - t) * Vec3::basis() + t * Vec3::rgb(0.5, 0.7, 1.0)
 }
 
 fn write_header(img_file: &mut File, path: &String, width: i32, height: i32) {

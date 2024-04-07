@@ -1,3 +1,5 @@
+use crate::ffi::drand48_safe;
+
 /// You almost always want to operate with vectors using algebraic expressions.
 ///
 /// This module contains the structs that required operate with 3D models
@@ -74,6 +76,30 @@ impl Vec3 {
 
     pub(crate) fn unit(&self) -> Vec3 {
         self / self.length()
+    }
+
+    pub(crate) fn basis() -> Vec3 {
+        Vec3::new(1.0, 1.0, 1.0)
+    }
+
+    pub(crate) fn zero() -> Vec3 {
+        Vec3::new(0.0, 0.0, 0.0)
+    }
+
+    pub(crate) fn rand() -> Vec3 {
+        Vec3::new(
+            drand48_safe() as f32,
+            drand48_safe() as f32,
+            drand48_safe() as f32)
+    }
+
+    pub(crate) fn random_in_unit_sphere() -> Vec3 {
+        loop {
+            let p = 2.0 * Vec3::rand() - Vec3::basis();
+            if p.squared_length() < 1.0 {
+                return p;
+            }
+        }
     }
 }
 
@@ -228,6 +254,26 @@ mod algebra {
                 y: self * other.y,
                 z: self * other.z,
             }
+        }
+    }
+
+    impl Mul<&Vec3> for &Vec3 {
+        type Output = Vec3;
+
+        fn mul(self, other: &Vec3) -> Vec3 {
+            Vec3 {
+                x: self.x * other.x,
+                y: self.y * other.y,
+                z: self.z * other.z,
+            }
+        }
+    }
+
+    impl Mul<Vec3> for &Vec3 {
+        type Output = Vec3;
+
+        fn mul(self, other: Vec3) -> Vec3 {
+            self * &other
         }
     }
 

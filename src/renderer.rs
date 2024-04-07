@@ -18,7 +18,7 @@ impl ColoringScheme {
 ///
 /// This function creates the background.
 ///
-pub(crate) fn create_blue_gradient_background(path: String, w: i32, h: i32) -> () {
+pub(crate) fn create_image(path: String, w: i32, h: i32) -> () {
 
     // For simplicity, we assume the aspect ratio is 2:1
     assert_eq!(w / h, 2 / 1, "Aspect ratio must be 2:1.");
@@ -38,7 +38,7 @@ pub(crate) fn create_blue_gradient_background(path: String, w: i32, h: i32) -> (
     print_status(&mut img_file, &path);
 }
 
-/// !!! NOTE !!!
+/// LEARN:
 /// Here we demonstrate the power of iterators in Rust.
 ///
 /// What method is doing:
@@ -46,7 +46,7 @@ pub(crate) fn create_blue_gradient_background(path: String, w: i32, h: i32) -> (
 /// over each pixel from left to right and calculate the color of the pixel.
 /// Then write the pixel's color to the image file.
 ///
-/// !!! NOTE !!!
+/// LEARN:
 /// In contrast to Java's Streams those iterators are Zero Cost Abstractions,
 /// meaning the compiler will optimize them away and the cost will be
 /// the same as of the `for` loop.
@@ -76,32 +76,35 @@ fn render_image(img: &mut File, w: i32, h: i32, path: &String){
     let horizontal = Vec3::new(4.0, 0.0, 0.0);
     let vertical = Vec3::new(0.0, 2.0, 0.0);
 
-    // !!! NOTE !!!
-    // No 2D creation is happening here, we're just defining the iterator over the 2D array of points.
-    // move |x| (x as f32, y as f32) creates a closure that captures the y value from the outer scope.
-    let xy_iter = (0..h).into_iter().rev()
-        .flat_map(|y| (0..w).into_iter().map(move |x| (x as f32, y as f32)));
-
-    // !!! NOTE !!!
-    // The first closure captures the ll_corner, horizontal and vertical values
+    // LEARN:
+    // The closure captures the ll_corner, horizontal and vertical values
     // from the outer scope. The captured value refs are copied into the closure by value.
     // This is done automatically by the Rust compiler. The least restrictive trait is used.
     // Hence, the closure implements the Fn trait that can be used multiple times,
     // i.e. for each iteration.
+    let render_pixel = |(x, y)| {
+        let u = x / w as f32;
+        let v = y / h as f32;
+        let direction = &ll_corner + u * &horizontal + v * &vertical;
+        let ray = Ray::from(origin.clone(), direction);
+
+        color(ColoringScheme::SPHERE, &ray)
+    };
+
+    // LEARN:
+    // No 2D creation is happening here, we're just defining the iterator
+    // over the 2D array of points. move |x| (x as f32, y as f32) creates a closure
+    // that captures the y value from the outer scope.
+    let xy_iter = (0..h).into_iter().rev()
+        .flat_map(|y| (0..w).into_iter().map(move |x| (x as f32, y as f32)));
 
     // `Result` is a monad that implements the `FromIterator` trait.
-    // It's `FromIterator` impl allows to collect the results of the iterator into a single Result of Vec<results>
+    // It's `FromIterator` impl allows to collect the results of the iterator
+    // into a single Result of Vec<results>
     // or stop on the first error.
 
     let result: Result<Vec<()>, Error> = xy_iter
-        .map(|(x, y)| {
-            let u = x / w as f32;
-            let v = y / h as f32;
-            let direction = &ll_corner + u * &horizontal + v * &vertical;
-            let ray = Ray::from(origin.clone(), direction);
-
-            color(ColoringScheme::SPHERE, &ray)
-        })
+        .map(render_pixel)
         .map(write_color_to_file(img))
         .collect();
 
@@ -120,7 +123,7 @@ fn write_color_to_file(img: &mut File) -> Box<dyn FnMut(Vec3) -> Result<(), Erro
         let ig = (255.99 * color.g()) as i32;
         let ib = (255.99 * color.b()) as i32;
 
-        // !!! NOTE !!!
+        // LEARN:
         // Here no heap allocations are happening.
         // No new strings are created. Format is a const string.
         // write! macro writes the format pieces and arguments to the file buffer.
@@ -182,14 +185,14 @@ fn create_img_file(path: &String) -> File {
 }
 
 fn print_status(img: &mut File, path: &String) {
-    // !!! NOTE!!!
+    // LEARN:
     // Again, this is an idiomatic way in Rust to chain IO operations and propagate errors
     // without a need to handle each IO error separately and explicitly.
     let size = img.sync_all()
         .and_then(|_| img.metadata())
         .map(|m| m.len());
 
-    // !!! NOTE !!!
+    // LEARN:
     // Here the size is a `Result` and it is consumed by the match statement.
     // Thus, we can reuse the size variable below in Ok path.
     match size {

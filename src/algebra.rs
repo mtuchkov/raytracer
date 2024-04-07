@@ -142,7 +142,7 @@ impl Add<Vec3> for &Vec3 {
     }
 }
 
-/// !!! NOTE !!!
+/// LEARN:
 /// This implementation of Add consumes both operands and returns a new Vec3 instance.
 impl Add<Vec3> for Vec3 {
     type Output = Vec3;

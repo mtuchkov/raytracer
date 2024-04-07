@@ -1,4 +1,4 @@
-use crate::algebra::{Vec3};
+use crate::vec::{Vec3};
 
 /**
 This trait defines the color trait.

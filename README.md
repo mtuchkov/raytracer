@@ -8,6 +8,9 @@ The goal of this project is to demonstrate how to write idiomatic Rust code,
 Rust's memory management, framework, tools, how to work with 
 parallelism in Rust, futures, and async/await.
 
+People with C++ background will find this project useful to learn Rust as 
+they can compare the C++ code from the book series with the Rust code.
+
 There are probably a plethora of attempts to implement this book series in Rust
 available on the internet, but I wanted to do it myself from scratch to avoid 
 being spoiled by other implementations.

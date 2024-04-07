@@ -3,17 +3,13 @@ This module contains the implementation of the PPM image creation.
 */
 use std::fs::File;
 use std::io::{Error, Write};
+use crate::camera::Camera;
 use crate::color::Color;
-use crate::algebra::{Ray, Vec3};
-
-type Scheme = u8;
-
-struct ColoringScheme;
-
-impl ColoringScheme {
-    pub const LERP: u8 = 1;
-    pub const SPHERE: u8 = 2;
-}
+use crate::ffi::drand48_safe;
+use crate::surfaces::hitable::Hitable;
+use crate::surfaces::Surface;
+use crate::surfaces::world::World;
+use crate::vec::{Ray, Vec3};
 
 ///
 /// This function creates the background.
@@ -62,19 +58,13 @@ pub(crate) fn create_image(path: String, w: i32, h: i32) -> () {
 
 /// This function is used to render different images, so it's generic over the color function.
 fn render_image(img: &mut File, w: i32, h: i32, path: &String){
+    let ns = 100;
 
-    // This is the lower left corner of the image.
-    // Following the way we used to think of 3D coordinate systems in school
-    // the point (0, 0, 0) is where the system of coordinates begins.
-    // This is the observer's point of view.
-    let origin = Vec3::new(0.0, 0.0, 0.0);
+    let mut world = World::new();
+    world.add(Surface::sphere(Vec3::new(0.0, 0.0, -1.0), 0.5));
+    world.add(Surface::sphere(Vec3::new(0.0, -100.5, -1.0), 100.0));
 
-    // In 3D system the origin corresponds to the middle point of the screen in front of it.
-
-    // Then screen's lower left corner is at (-2, -1, -1)
-    let ll_corner = Vec3::new(-2.0, -1.0, -1.0);
-    let horizontal = Vec3::new(4.0, 0.0, 0.0);
-    let vertical = Vec3::new(0.0, 2.0, 0.0);
+    let camera = Camera::new();
 
     // LEARN:
     // The closure captures the ll_corner, horizontal and vertical values
@@ -83,12 +73,17 @@ fn render_image(img: &mut File, w: i32, h: i32, path: &String){
     // Hence, the closure implements the Fn trait that can be used multiple times,
     // i.e. for each iteration.
     let render_pixel = |(x, y)| {
-        let u = x / w as f32;
-        let v = y / h as f32;
-        let direction = &ll_corner + u * &horizontal + v * &vertical;
-        let ray = Ray::from(origin.clone(), direction);
+        let mut col = Vec3::rgb(0.0, 0.0, 0.0);
+        // Antialiasing loop
+        for s in 0..ns {
+            let u = (x as f64 + drand48_safe()) as f32 / w as f32;
+            let v = (y as f64 + drand48_safe()) as f32 / h as f32;
 
-        color(ColoringScheme::SPHERE, &ray)
+            let ray = camera.get_ray(u, v);
+            col += color(&world, &ray);
+        }
+        col /= ns as f32;
+        col
     };
 
     // LEARN:
@@ -118,10 +113,16 @@ fn render_image(img: &mut File, w: i32, h: i32, path: &String){
 
 fn write_color_to_file(img: &mut File) -> Box<dyn FnMut(Vec3) -> Result<(), Error> + '_> {
     Box::new(|color: Vec3| {
+        // There is a bug in the book, probably.
+        // According to the book the color should be divided by ns.
+        // But the image turns to be very dark.
+        // let mut col = color / ns;
+        // Gamma correction
+        let col = Vec3::new(color.r().sqrt(), color.g().sqrt(), color.b().sqrt());
         // normalize the color values to [0, 255] and convert them to integers
-        let ir = (255.99 * color.r()) as i32;
-        let ig = (255.99 * color.g()) as i32;
-        let ib = (255.99 * color.b()) as i32;
+        let ir = (255.99 * col.r()) as i32;
+        let ig = (255.99 * col.g()) as i32;
+        let ib = (255.99 * col.b()) as i32;
 
         // LEARN:
         // Here no heap allocations are happening.
@@ -131,33 +132,29 @@ fn write_color_to_file(img: &mut File) -> Box<dyn FnMut(Vec3) -> Result<(), Erro
     })
 }
 
-fn color(scheme: Scheme, r: &Ray) -> Vec3 {
-    match scheme {
-        ColoringScheme::LERP => background(r),
-        ColoringScheme::SPHERE => sphere(r),
-        _ => panic!("Unknown coloring scheme {}.", scheme),
+fn random_in_unit_sphere() -> Vec3 {
+    loop {
+        let rand = Vec3::new(
+            drand48_safe() as f32,
+            drand48_safe() as f32,
+            drand48_safe() as f32);
+        let vec1 = Vec3::rgb(1.0, 1.0, 1.0);
+        let p = 2.0 * rand - vec1;
+        if p.squared_length() < 1.0 {
+            return p;
+        }
     }
 }
 
-fn sphere(r: &Ray) -> Vec3 {
-    let t = hit_sphere(&Vec3::new(0.0, 0.0, -1.0), 0.5, r);
-    if t > 0.0 {
-        let n = (r.point_at(t) - Vec3::new(0.0, 0.0, -1.0)).unit();
-        return 0.5 * Vec3::rgb(n.x() + 1.0, n.y() + 1.0, n.z() + 1.0);
-    }
-    background(r)
-}
-
-fn hit_sphere(center: &Vec3, radius: f32, r: &Ray) -> f32 {
-    let oc = r.origin() - center;
-    let a = Vec3::dot(r.direction(), r.direction());
-    let b = 2.0 * Vec3::dot(&oc, r.direction());
-    let c = Vec3::dot(&oc, &oc) - radius * radius;
-    let discriminant = b * b - 4.0 * a * c;
-    if discriminant > 0.0 {
-        (-b - discriminant.sqrt()) / (2.0 * a)
-    } else {
-        -1.0
+fn color(w: &World, r: &Ray) -> Vec3 {
+    // 0.001 as a min value is chosen to avoid the
+    // shadow acne problem (too white or too dark spots).
+    match w.hit(r, 0.001, std::f32::MAX) {
+        Some(hit) => {
+            let target = &hit.p + hit.normal + random_in_unit_sphere();
+            0.5 * color(w, &Ray::from(hit.p.clone(), target - hit.p))
+        },
+        None => background(r),
     }
 }
 

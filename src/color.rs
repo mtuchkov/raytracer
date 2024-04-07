@@ -1,15 +1,13 @@
 use crate::vec::{Vec3};
 
-/**
-This trait defines the color trait.
-
-It extends the Vec3 struct with methods related to colors but only available for Vec3 instances
-when color module is explicitly referenced.
-
-We could append all of these methods directly to the Vec3, but this way
-we can keep the Vec3 struct clean and demonstrate the interface composition.
-*/
-
+/// LEARN
+/// This trait defines the color trait.
+///
+/// It extends the Vec3 struct with methods related to colors but only available for Vec3 instances
+/// when color module is explicitly referenced.
+///
+/// We could append all of these methods directly to the Vec3, but this way
+/// we can keep the Vec3 struct clean and demonstrate the interface composition.
 pub(crate) trait Color {
     fn r(&self) -> f32;
     fn g(&self) -> f32;

@@ -29,7 +29,7 @@ pub(crate) fn create_image(path: String, w: i32, h: i32) -> () {
 
     write_header(&mut img_file, &path, w, h);
 
-    render_image(&mut img_file, w, h, &path);
+    render_image(&mut img_file, &path, w, h);
 
     print_status(&mut img_file, &path);
 }
@@ -57,7 +57,7 @@ pub(crate) fn create_image(path: String, w: i32, h: i32) -> () {
 /// The iterator will stop at the first error and return it.
 
 /// This function is used to render different images, so it's generic over the color function.
-fn render_image(img: &mut File, w: i32, h: i32, path: &String){
+fn render_image(img: &mut File, path: &String, w: i32, h: i32){
     let ns = 100;
 
     let mut world = World::new();
@@ -67,15 +67,18 @@ fn render_image(img: &mut File, w: i32, h: i32, path: &String){
     let camera = Camera::new();
 
     // LEARN:
-    // The closure captures the ll_corner, horizontal and vertical values
+    // The closure captures the world and camera values
     // from the outer scope. The captured value refs are copied into the closure by value.
-    // This is done automatically by the Rust compiler. The least restrictive trait is used.
-    // Hence, the closure implements the Fn trait that can be used multiple times,
-    // i.e. for each iteration.
+    // This is done automatically by the Rust compiler.
+    // Not all closures can run multiple times. E.g. the ones that consume the captured
+    // values can run only once. Such closures implement FnOnce trait.
+    // Compiler chooses the least restrictive trait that fits the closure.
+    // Here the closure implements the Fn trait that can be used multiple times,
+    // i.e. for each iteration, which is what we need.
     let render_pixel = |(x, y)| {
         let mut col = Vec3::rgb(0.0, 0.0, 0.0);
         // Antialiasing loop
-        for s in 0..ns {
+        for _ in 0..ns {
             let u = (x as f64 + drand48_safe()) as f32 / w as f32;
             let v = (y as f64 + drand48_safe()) as f32 / h as f32;
 
@@ -93,6 +96,7 @@ fn render_image(img: &mut File, w: i32, h: i32, path: &String){
     let xy_iter = (0..h).into_iter().rev()
         .flat_map(|y| (0..w).into_iter().map(move |x| (x as f32, y as f32)));
 
+    // LEARN:
     // `Result` is a monad that implements the `FromIterator` trait.
     // It's `FromIterator` impl allows to collect the results of the iterator
     // into a single Result of Vec<results>
@@ -117,7 +121,7 @@ fn write_color_to_file(img: &mut File) -> Box<dyn FnMut(Vec3) -> Result<(), Erro
         // According to the book the color should be divided by ns.
         // But the image turns to be very dark.
         // let mut col = color / ns;
-        // Gamma correction
+        // Gamma correction (gamma 2) is applied to the color to make the objects lighter.
         let col = Vec3::new(color.r().sqrt(), color.g().sqrt(), color.b().sqrt());
         // normalize the color values to [0, 255] and convert them to integers
         let ir = (255.99 * col.r()) as i32;
@@ -127,7 +131,8 @@ fn write_color_to_file(img: &mut File) -> Box<dyn FnMut(Vec3) -> Result<(), Erro
         // LEARN:
         // Here no heap allocations are happening.
         // No new strings are created. Format is a const string.
-        // write! macro writes the format pieces and arguments to the file buffer.
+        // write! macro splits the format, and writes the pieces and arguments
+        // to the file buffer.
         write!(img, "{} {} {}\n", ir, ig, ib)
     })
 }
@@ -158,9 +163,7 @@ fn color(w: &World, r: &Ray) -> Vec3 {
     }
 }
 
-/// Simple linear interpolation (lerp) of the blue color channel on the Y axis.
-/// Remember, the purpose is to learn Rust, never do that in real code.
-/// Instead, you could pass the coloring function as a parameter.
+/// Simple linear interpolation of the blue color channel on the Y axis.
 fn background(r: &Ray) -> Vec3 {
     let unit_direction = r.direction().unit();
     let t = 0.5 * (unit_direction.y() + 1.0);

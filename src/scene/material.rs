@@ -1,6 +1,6 @@
-use crate::ffi::drand32;
-use crate::surfaces::hitable::HitRecord;
-use crate::vec::{Ray, Vec3};
+use crate::math::rand::drand32;
+use crate::scene::surfaces::hitable::HitRecord;
+use crate::math::vec::{Ray, Vec3};
 
 pub(crate) enum Material {
     // randomly diffuses the light

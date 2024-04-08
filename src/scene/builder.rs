@@ -1,11 +1,11 @@
-use crate::camera::Camera;
-use crate::color::Color;
-use crate::ffi::drand32;
-use crate::material::Material;
+use crate::scene::camera::Camera;
+use crate::math::color::Color;
+use crate::math::rand::drand32;
+use crate::scene::material::Material;
 use crate::scene::Scene;
-use crate::surfaces::Surface;
-use crate::surfaces::world::World;
-use crate::vec::Vec3;
+use crate::scene::surfaces::Surface;
+use crate::scene::surfaces::world::World;
+use crate::math::vec::Vec3;
 
 pub(crate) trait SceneBuilder {
     fn build(&self) -> Scene;
@@ -36,35 +36,37 @@ impl BuiltIn {
 
     fn buidl_default_scene(&self) -> Scene {
         Scene {
-            camera: self.create_camera(200, 100),
+            camera: Camera::static_camera(),
             world: self.create_default_world(),
-            w: 200,
-            h: 100,
-        }
-    }
-
-    fn build_random_scene(&self) -> Scene {
-        Scene {
-            camera: self.create_camera(200, 100),
-            world: self.create_random_world(),
             w: 1024,
             h: 512,
         }
     }
 
-    fn create_camera(&self, w: i32, h: i32) -> Camera {
+    fn build_random_scene(&self) -> Scene {
+        let w = 1024;
+        let h = 512;
+        Scene {
+            camera: self.positionable_camera(w, h),
+            world: self.create_random_world(),
+            w: w,
+            h: h,
+        }
+    }
+
+    fn positionable_camera(&self, w: i32, h: i32) -> Camera {
         // LEARN:
         // float declaration can omit the trailing zeros, e.g. 0.0 -> 0.
         // Rust does not allow the implicit cast, so this is not a problem in the code review.
-        let look_from = Vec3::new(2., 2., 0.);
+        let look_from = Vec3::new(3., 3., 2.);
         let look_at = Vec3::new(0., 0., -1.);
         let dist_to_focus = (&look_from - &look_at).length();
         let up = Vec3::new(0., 1., 0.);
         let fov = 20.;
         let aspect = w as f32 / h as f32;
-        let aperture= 0.1;
+        let aperture= 2.0;
 
-        Camera::new(
+        Camera::positionable(
             look_from,
             look_at,
             up,
@@ -117,8 +119,8 @@ impl BuiltIn {
                 1000.0,
                 Material::lambertian(Vec3::rgb(0.5, 0.5, 0.5))));
 
-        for a in -11..11 {
-            for b in -11..11 {
+        for a in -1..=1 {
+            for b in -1..=1 {
                 let material = (drand32() * 100.) as i32;
                 assert!(material >= 0 && material < 100, "Material index out of range");
                 let center = Vec3::new(a as f32 + 0.9 * drand32(), 0.2, b as f32 + 0.9 * drand32());

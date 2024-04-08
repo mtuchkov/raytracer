@@ -1,4 +1,4 @@
-use crate::ffi::drand32;
+use crate::math::rand::drand32;
 
 /// You almost always want to operate with vectors using algebraic expressions.
 ///

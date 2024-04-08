@@ -1,6 +1,6 @@
-use crate::surfaces::hitable::{Hitable, HitRecord};
-use crate::surfaces::Surface;
-use crate::vec::Ray;
+use crate::scene::surfaces::hitable::{Hitable, HitRecord};
+use crate::scene::surfaces::Surface;
+use crate::math::vec::Ray;
 
 pub(crate) struct World {
     objects: Vec<Surface>,

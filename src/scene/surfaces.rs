@@ -2,9 +2,9 @@ pub(crate) mod hitable;
 pub(crate) mod sphere;
 pub(crate) mod world;
 
-use crate::material::Material;
-use crate::surfaces::Surface::Sphere;
-use crate::vec::Vec3;
+use crate::math::vec::Vec3;
+use crate::scene::material::Material;
+use crate::scene::surfaces::Surface::Sphere;
 
 pub(crate) enum Surface {
     Sphere {

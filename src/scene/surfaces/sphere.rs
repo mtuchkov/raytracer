@@ -1,8 +1,8 @@
-use crate::material::Material;
-use crate::vec::{Ray, Vec3};
-use crate::surfaces::hitable::{Hitable, HitRecord};
-use crate::surfaces::Surface;
-use crate::surfaces::Surface::{Sphere};
+use crate::scene::material::Material;
+use crate::math::vec::{Ray, Vec3};
+use crate::scene::surfaces::hitable::{Hitable, HitRecord};
+use crate::scene::surfaces::Surface;
+use crate::scene::surfaces::Surface::{Sphere};
 
 impl Hitable for Surface {
     fn hit<'a>(&'a self, r: &'a Ray, t_min: f32, t_max: f32) -> Option<HitRecord> {

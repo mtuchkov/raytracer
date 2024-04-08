@@ -5,13 +5,14 @@ use std::fs::File;
 use std::io::{Error, Write};
 use std::time::Instant;
 
-use crate::color::Color;
-use crate::ffi::drand32;
-use crate::material::Scatterable;
+use crate::math::color::Color;
+use crate::math::rand::drand32;
+use crate::math::vec::{Ray, Vec3};
+use crate::scene::camera::{RaySource};
+use crate::scene::material::Scatterable;
 use crate::scene::Scene;
-use crate::surfaces::hitable::Hitable;
-use crate::surfaces::world::World;
-use crate::vec::{Ray, Vec3};
+use crate::scene::surfaces::hitable::Hitable;
+use crate::scene::surfaces::world::World;
 
 ///
 /// This is the main function to render the scene directly to the file.
@@ -166,18 +167,4 @@ fn background(r: &Ray) -> Vec3 {
     let unit_direction = r.direction().unit();
     let t = 0.5 * (unit_direction.y() + 1.0);
     (1.0 - t) * Vec3::basis() + t * Vec3::rgb(0.5, 0.7, 1.0)
-}
-
-fn write_header(img_file: &mut File, path: &String, scene: &Scene) {
-    match write!(img_file, "P3\n{} {}\n255\n", scene.w, scene.h) {
-        Ok(_) => println!("Image header written successfully."),
-        Err(why) => panic!("Couldn't write header to image. [Path {}, Reason: {}]", path, why),
-    }
-}
-
-fn create_img_file(path: &String) -> File {
-    match File::create(&path) {
-        Ok(file) => file,
-        Err(why) => panic!("Couldn't create image. [Path {}, Reason: {}]", path, why),
-    }
 }

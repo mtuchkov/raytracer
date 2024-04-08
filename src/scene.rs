@@ -1,8 +1,10 @@
-use crate::camera::Camera;
-use crate::color::Color;
-use crate::surfaces::world::World;
+use surfaces::world::World;
+use crate::scene::camera::Camera;
 
 pub(crate) mod builder;
+pub mod surfaces;
+pub mod material;
+pub(crate) mod camera;
 
 pub(crate) struct Scene {
     pub(crate) camera: Camera,

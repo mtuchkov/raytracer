@@ -1,5 +1,5 @@
-use crate::material::Material;
-use crate::vec::{Ray, Vec3};
+use crate::scene::material::Material;
+use crate::math::vec::{Ray, Vec3};
 
 pub(crate) struct HitRecord<'a> {
     // LEARN:
@@ -15,7 +15,5 @@ pub(crate) trait Hitable {
     /// LEARN:
     /// The original book uses a mutable reference to HitRecord.
     /// This is not idiomatic Rust. We use an Option of HitRecord instead.
-    /// We will measure the performance impact of this change.
-    /// TODO: Update the result of the performance measurement.
     fn hit<'a>(&'a self, r: &'a Ray, t_min: f32, t_max: f32) -> Option<HitRecord>;
 }

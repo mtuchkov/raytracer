@@ -3,6 +3,7 @@ This module contains the implementation of the PPM image creation.
 */
 use std::fs::File;
 use std::io::{Error, Write};
+use std::path::Path;
 use std::time::Instant;
 
 use crate::math::color::Color;
@@ -17,7 +18,7 @@ use crate::scene::surfaces::world::World;
 ///
 /// This is the main function to render the scene directly to the file.
 ///
-pub(crate) fn render_scene(scene: &Scene, path: String) -> Result<(), Error> {
+pub(crate) fn render_scene(scene: &Scene, path: &Path) -> Result<(), Error> {
 
     let now = Instant::now();
 

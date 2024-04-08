@@ -1,4 +1,4 @@
-use crate::ffi::drand48_safe;
+use crate::ffi::drand32;
 
 /// You almost always want to operate with vectors using algebraic expressions.
 ///
@@ -59,19 +59,12 @@ impl Vec3 {
     }
 
     /// Cross product of two vectors.
-    #[allow(dead_code)]
-    fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
+    pub(crate) fn cross(v1: &Vec3, v2: &Vec3) -> Vec3 {
         Vec3 {
             x: v1.y * v2.z - v1.z * v2.y,
             y: v1.z * v2.x - v1.x * v2.z,
             z: v1.x * v2.y - v1.y * v2.x,
         }
-    }
-
-    /// Returns a new vector that is the unit vector of the given vector.
-    #[allow(dead_code)]
-    fn make_unit(v: &Vec3) -> Vec3 {
-        v / v.length()
     }
 
     pub(crate) fn unit(&self) -> Vec3 {
@@ -87,16 +80,24 @@ impl Vec3 {
     }
 
     pub(crate) fn rand() -> Vec3 {
-        Vec3::new(
-            drand48_safe() as f32,
-            drand48_safe() as f32,
-            drand48_safe() as f32)
+        Vec3::new(drand32(), drand32(), drand32())
     }
 
     pub(crate) fn random_in_unit_sphere() -> Vec3 {
         loop {
             let p = 2.0 * Vec3::rand() - Vec3::basis();
             if p.squared_length() < 1.0 {
+                return p;
+            }
+        }
+    }
+
+    pub(crate) fn random_in_unit_disk() -> Vec3 {
+        loop {
+            let rand_2d = Vec3::new(drand32(), drand32(), 0.);
+            let basis_2d = Vec3::new(1.0, 1.0, 0.0);
+            let p = 2.0 * rand_2d - basis_2d;
+            if Vec3::dot(&p, &p) < 1. {
                 return p;
             }
         }

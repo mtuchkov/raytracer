@@ -19,8 +19,9 @@ extern {
 /// LEARN:
 /// Even though the function is safe to use, we need to mark it as unsafe
 /// because it uses FFI to call the function.
-pub fn drand48_safe() -> f64 {
+/// Also, we drop some precision by casting the result to f32.
+pub fn drand32() -> f32 {
     unsafe {
-        drand48()
+        drand48() as f32
     }
 }

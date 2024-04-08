@@ -1,4 +1,4 @@
-use crate::ffi::drand48_safe;
+use crate::ffi::drand32;
 use crate::surfaces::hitable::HitRecord;
 use crate::vec::{Ray, Vec3};
 
@@ -58,8 +58,8 @@ impl Scatterable for Material {
     // In Rust the idiomatic way is to return an Option<(ray: Ray, attenuation:Vec3)> instead.
     // Note that the HitRecord is consumed by this function.
     fn scatter(&self,
-                          r_in: &Ray,
-                          rec: HitRecord) -> Option<(Ray, &Vec3)> {
+               r_in: &Ray,
+               rec: HitRecord) -> Option<(Ray, &Vec3)> {
 
         // LEARN:
         // The `match` must be exhaustive. We need to handle all variants of the enum.
@@ -89,6 +89,9 @@ impl Scatterable for Material {
             r0 + (1.0 - r0) * (1.0 - cosine).powi(5)
         }
 
+        // LEARN:
+        // breaking the match into separate functions makes the code more readable.
+        // however, here we just wanted to demonstrate the local functions.
         match self {
             // LEARN:
             // the enum is destructed her and the structs fields are accessed by ref.
@@ -128,11 +131,17 @@ impl Scatterable for Material {
                     outward_normal = rec.normal;
                 }
 
+                // LEARN:
+                // You may notice the control flow is different from the C++ code in the book.
+                // One of the reasons is that the compiler forces to structure the code in a way
+                // that the ownership of the variables is clear and the destructing or consuming
+                // operations move toward to the tail of the scope of the variables.
+
                 match refract(&r_in.direction(), &outward_normal, ni_over_nt) {
                     Some(refracted) => {
                         // some rays are reflected and some are refracted
                         // depends on the angle of view
-                        if (drand48_safe() as f32) >= schlick(cosine, *ref_idx) {
+                        if drand32() >= schlick(cosine, *ref_idx) {
                             Some((Ray::from(rec.p, refracted), attenuation))
                         } else {
                             Some((Ray::from(rec.p, reflected), attenuation))

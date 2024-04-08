@@ -3,34 +3,25 @@ This module contains the implementation of the PPM image creation.
 */
 use std::fs::File;
 use std::io::{Error, Write};
-use crate::camera::Camera;
+
 use crate::color::Color;
-use crate::ffi::drand48_safe;
-use crate::material::{Material, Scatterable};
+use crate::ffi::drand32;
+use crate::material::Scatterable;
+use crate::scene::Scene;
 use crate::surfaces::hitable::Hitable;
-use crate::surfaces::Surface;
 use crate::surfaces::world::World;
 use crate::vec::{Ray, Vec3};
 
 ///
 /// This function creates the background.
 ///
-pub(crate) fn create_image(path: String, w: i32, h: i32) -> () {
-
-    // For simplicity, we assume the aspect ratio is 2:1
-    assert_eq!(w / h, 2 / 1, "Aspect ratio must be 2:1.");
-    assert!(w >= 100, "Width is too small.");
-    assert!(h >= 50, "Height is too small.");
+pub(crate) fn create_image(scene: &Scene, path: String) -> () {
 
     let mut img_file = create_img_file(&path);
 
-    write_header(&mut img_file, &path, w, h);
+    write_header(&mut img_file, &path, scene);
 
-    let mut img_file = create_img_file(&path);
-
-    write_header(&mut img_file, &path, w, h);
-
-    render_image(&mut img_file, &path, w, h);
+    render_image(scene, &mut img_file, &path);
 
     print_status(&mut img_file, &path);
 }
@@ -58,38 +49,8 @@ pub(crate) fn create_image(path: String, w: i32, h: i32) -> () {
 /// The iterator will stop at the first error and return it.
 
 /// This function is used to render different images, so it's generic over the color function.
-fn render_image(img: &mut File, path: &String, w: i32, h: i32){
+fn render_image(scene: &Scene, img: &mut File, path: &String){
     let ns = 100;
-
-    let mut world = World::new();
-
-    world.add(
-        Surface::sphere(
-            Vec3::new(0.0, 0.0, -1.0),
-            0.5,
-            Material::lambertian(Vec3::rgb(0.1, 0.2, 0.5))));
-    world.add(
-        Surface::sphere(
-            Vec3::new(0.0, -100.5, -1.0),
-            100.0,
-            Material::lambertian(Vec3::rgb(0.8, 0.8, 0.0))));
-    world.add(
-        Surface::sphere(
-            Vec3::new(1.0, 0.0, -1.0),
-            0.5,
-            Material::metal(Vec3::rgb(0.8, 0.6, 0.2), 0.2)));
-    world.add(
-        Surface::sphere(
-            Vec3::new(-1.0, 0.0, -1.0),
-            0.5,
-            Material::dielectric(1.5)));
-    world.add(
-        Surface::sphere(
-            Vec3::new(-1.0, 0.0, -1.0),
-            -0.45, // trick with negative radius to make the sphere hollow
-            Material::dielectric(1.5)));
-
-    let camera = Camera::new();
 
     // LEARN:
     // The closure captures the world and camera values
@@ -104,11 +65,11 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
         let mut col = Vec3::rgb(0.0, 0.0, 0.0);
         // Antialiasing loop
         for _ in 0..ns {
-            let u = (x as f64 + drand48_safe()) as f32 / w as f32;
-            let v = (y as f64 + drand48_safe()) as f32 / h as f32;
+            let u = (x + drand32()) / scene.w as f32;
+            let v = (y + drand32()) / scene.h as f32;
 
-            let ray = camera.get_ray(u, v);
-            col += color(&world, &ray, 0);
+            let ray = scene.camera().get_ray(u, v);
+            col += color(scene.world(), &ray, 0);
         }
         col /= ns as f32;
         col
@@ -118,8 +79,8 @@ fn render_image(img: &mut File, path: &String, w: i32, h: i32){
     // No 2D creation is happening here, we're just defining the iterator
     // over the 2D array of points. move |x| (x as f32, y as f32) creates a closure
     // that captures the y value from the outer scope.
-    let xy_iter = (0..h).into_iter().rev()
-        .flat_map(|y| (0..w).into_iter().map(move |x| (x as f32, y as f32)));
+    let xy_iter = (0..scene.h).into_iter().rev()
+        .flat_map(|y| (0..scene.w).into_iter().map(move |x| (x as f32, y as f32)));
 
     // LEARN:
     // Note that the last `map` operation returns the `Result<(), Error>` type.
@@ -195,8 +156,8 @@ fn background(r: &Ray) -> Vec3 {
     (1.0 - t) * Vec3::basis() + t * Vec3::rgb(0.5, 0.7, 1.0)
 }
 
-fn write_header(img_file: &mut File, path: &String, width: i32, height: i32) {
-    match write!(img_file, "P3\n{} {}\n255\n", width, height) {
+fn write_header(img_file: &mut File, path: &String, scene: &Scene) {
+    match write!(img_file, "P3\n{} {}\n255\n", scene.w, scene.h) {
         Ok(_) => println!("Image header written successfully."),
         Err(why) => panic!("Couldn't write header to image. [Path {}, Reason: {}]", path, why),
     }

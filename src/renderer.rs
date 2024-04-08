@@ -3,6 +3,7 @@ This module contains the implementation of the PPM image creation.
 */
 use std::fs::File;
 use std::io::{Error, Write};
+use std::time::Instant;
 
 use crate::color::Color;
 use crate::ffi::drand32;
@@ -13,17 +14,33 @@ use crate::surfaces::world::World;
 use crate::vec::{Ray, Vec3};
 
 ///
-/// This function creates the background.
+/// This is the main function to render the scene directly to the file.
 ///
-pub(crate) fn create_image(scene: &Scene, path: String) -> () {
+pub(crate) fn render_scene(scene: &Scene, path: String) -> Result<(), Error> {
 
-    let mut img_file = create_img_file(&path);
+    let now = Instant::now();
 
-    write_header(&mut img_file, &path, scene);
+    // LEARN:
+    // The ? is a shortcut for the match statement that returns the error
+    // we could write match File::create(&path) { Ok(file) => file, Err(why) => return Err(why) }
+    // but look how much cleaner the code is with the ? operator.
+    // The ? operator can be used in functions that return Result type.
+    let mut img_file = File::create(&path)?;
 
-    render_image(scene, &mut img_file, &path);
+    write!(img_file, "P3\n{} {}\n255\n", scene.w, scene.h)?;
 
-    print_status(&mut img_file, &path);
+    render_to_file(scene, &mut img_file)?;
+
+    img_file.sync_all()?;
+
+    let size = img_file.metadata()?.len();
+
+    // LEARN:
+    // The idiomatic way to control how long the file is open is to use a scope { }.
+
+    println!("File size {} bytes. Render time {} secs", size, now.elapsed().as_secs());
+
+    Ok(())
 }
 
 /// LEARN:
@@ -49,7 +66,7 @@ pub(crate) fn create_image(scene: &Scene, path: String) -> () {
 /// The iterator will stop at the first error and return it.
 
 /// This function is used to render different images, so it's generic over the color function.
-fn render_image(scene: &Scene, img: &mut File, path: &String){
+fn render_to_file(scene: &Scene, img: &mut File) -> Result<(), Error> {
     let ns = 100;
 
     // LEARN:
@@ -98,12 +115,7 @@ fn render_image(scene: &Scene, img: &mut File, path: &String){
         .map(write_color_to_file(img))
         .collect();
 
-    match result {
-        Ok(_) => {
-            println!("Image rendering has finished.");
-        },
-        Err(why) => panic!("Couldn't render the image. [Path {}, Reason: {}]", path, why),
-    }
+    result.map(|_| ())
 }
 
 fn write_color_to_file(img: &mut File) -> impl FnMut(Vec3) -> Result<(), Error> + '_ {
@@ -167,24 +179,5 @@ fn create_img_file(path: &String) -> File {
     match File::create(&path) {
         Ok(file) => file,
         Err(why) => panic!("Couldn't create image. [Path {}, Reason: {}]", path, why),
-    }
-}
-
-fn print_status(img: &mut File, path: &String) {
-    // LEARN:
-    // Again, this is an idiomatic way in Rust to chain IO operations and propagate errors
-    // without a need to handle each IO error separately and explicitly.
-    let size = img.sync_all()
-        .and_then(|_| img.metadata())
-        .map(|m| m.len());
-
-    // LEARN:
-    // Here the size is a `Result` and it is consumed by the match statement.
-    // Thus, we can reuse the size variable below in Ok path.
-    match size {
-        Ok(size) => {
-            println!("Image successfully created. [Path {}; File size: {} bytes]", path, size);
-        },
-        Err(why) => panic!("Couldn't render the image. [Path {}, Reason: {}]", path, why),
     }
 }

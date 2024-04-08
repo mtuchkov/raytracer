@@ -20,5 +20,8 @@ mod scene;
 fn main() {
     let scene_builder = scene::builder::BuiltIn::random();
     let scene = scene_builder.build();
-    renderer::create_image(&scene, "../blue.ppm".to_string());
+    match renderer::render_scene(&scene, "../result.ppm".to_string()) {
+        Ok(_) => println!("Image successfully created."),
+        Err(why) => println!("Error: {}", why),
+    }
 }
